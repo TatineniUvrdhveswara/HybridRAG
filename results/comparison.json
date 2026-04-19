@@ -1,0 +1,36 @@
+{
+  "query": "How does git branching work?",
+  "rouge_l_between_answers": 0.2464,
+  "vectordb_rag": {
+    "method": "VectorDB RAG",
+    "query": "How does git branching work?",
+    "answer_preview": "Git's branching model is described as a \"killer feature\" because it is incredibly lightweight, making branching operations nearly instantaneous and switching between branches fast. This encourages fre...",
+    "latency_total_sec": 6.198,
+    "latency_retrieval_sec": 0.899,
+    "latency_generation_sec": 5.299,
+    "avg_retrieval_score": 0.755,
+    "num_chunks_retrieved": 5,
+    "retrieval_diversity": 0.6,
+    "context_length_chars": 2578,
+    "answer_word_count": 152,
+    "faithfulness_score": 0.8,
+    "relevance_score": 0.9,
+    "full_answer": "Git's branching model is described as a \"killer feature\" because it is incredibly lightweight, making branching operations nearly instantaneous and switching between branches fast. This encourages frequent branching and merging.\n\nTo understand how it works, it's important to know that Git stores data as a series of snapshots. When you make a commit, Git stores a commit object that contains a pointer to the snapshot of the content and a pointer to the commit that came immediately before it.\n\nA branch in Git is simply a lightweight movable pointer to one of these commits. The default branch is `master`, which points to your last commit, and its pointer moves forward automatically with each new commit. When you create a new branch, for example with `git branch testing`, Git creates a new pointer to the same commit you're currently on. Git knows which branch you're currently on because it keeps a special pointer."
+  },
+  "page_index_rag": {
+    "method": "Page Index RAG",
+    "query": "How does git branching work?",
+    "answer_preview": "Git's branching is incredibly lightweight, making branching operations nearly instantaneous, and switching back and forth between branches generally just as fast. Branching means you diverge from the ...",
+    "latency_total_sec": 4.521,
+    "latency_retrieval_sec": 0.103,
+    "latency_generation_sec": 4.418,
+    "avg_retrieval_score": 9.7583,
+    "num_chunks_retrieved": 5,
+    "retrieval_diversity": 1.0,
+    "context_length_chars": 4082,
+    "answer_word_count": 54,
+    "faithfulness_score": -1.0,
+    "relevance_score": -1.0,
+    "full_answer": "Git's branching is incredibly lightweight, making branching operations nearly instantaneous, and switching back and forth between branches generally just as fast. Branching means you diverge from the main line of development and continue to do work without messing with that main line. Unlike many other VCSs, Git encourages workflows that branch and merge often."
+  }
+}
