@@ -1,18 +1,47 @@
-import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useState, useEffect } from 'react';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+} from 'recharts';
 import './index.css';
+
+const COLORS = ['#3a86ff', '#06d6a0', '#9d4edd'];
 
 function App() {
   const [query, setQuery] = useState('');
+  const [route, setRoute] = useState(window.location.hash || '#compare');
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const handleHashChange = () => setRoute(window.location.hash || '#compare');
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!query) return;
 
     setIsLoading(true);
-    setData(null);
+    setError(null);
 
     try {
       const response = await fetch('http://localhost:8000/api/compare', {
@@ -20,15 +49,24 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
       const result = await response.json();
       setData(result);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      alert("Failed to fetch answers. Make sure the backend is running!");
+      window.location.hash = '#compare';
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Unable to fetch results. Verify the backend is running and try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const navClass = (target) => (route === target ? 'tab-link active' : 'tab-link');
+  const results = data?.results;
 
   return (
     <div className="container">
@@ -37,8 +75,17 @@ function App() {
           <span className="gradient-text">Hybrid</span> RAG Comparison
         </h1>
         <p className="subtitle">
-          Discover why combining <strong>Vector Search</strong> and <strong>Page Keywords</strong> is optimal for real-world document retrieval.
+          Search once, compare three RAG systems, and review metrics on a separate dashboard page.
         </p>
+
+        <div className="nav-tabs">
+          <a href="#compare" className={navClass('#compare')}>
+            Compare Responses
+          </a>
+          <a href="#dashboard" className={navClass('#dashboard')}>
+            Metrics Dashboard
+          </a>
+        </div>
 
         <form onSubmit={handleSearch} className="search-form">
           <input
@@ -46,7 +93,7 @@ function App() {
             className="search-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask a question about the Pro Git book... (e.g. 'What is git rebase?')"
+            placeholder="Ask a question about the Pro Git book..."
           />
           <button type="submit" className="search-button" disabled={isLoading}>
             {isLoading ? 'Searching...' : 'Compare Paths'}
@@ -54,76 +101,90 @@ function App() {
         </form>
       </header>
 
+      {error && <div className="error-banner">{error}</div>}
+
       {isLoading && (
         <div className="loading-state">
           <div className="spinner"></div>
-          <p>Querying 3 individual RAG systems... This takes about 10-15 seconds to respect rate limits.</p>
+          <p>Querying 3 individual RAG systems... This takes about 10-15 seconds.</p>
         </div>
       )}
 
-      {data && (
-        <main className="dashboard">
-          <div className="results-grid">
-            <ResultColumn title="VectorDB RAG" data={data.results.vectordb} icon="v" />
-            <ResultColumn title="Page Index RAG" data={data.results.page_index} icon="P" />
-            <ResultColumn title="Hybrid RAG 🌟" data={data.results.hybrid} isHybrid={true} icon="H" />
-          </div>
-
-          <div className="metrics-dashboard panel">
-            <h2>🏆 Aggregate Metrics Dashboard</h2>
-            
-            <div className="charts-wrapper">
-              <MetricsCharts data={data.results} />
+      {route === '#compare' && (
+        <main className="compare-page">
+          {results ? (
+            <div className="results-grid">
+              <ResultColumn title="VectorDB RAG" data={results.vectordb} icon="V" />
+              <ResultColumn title="Page Index RAG" data={results.page_index} icon="P" />
+              <ResultColumn title="Hybrid RAG 🌟" data={results.hybrid} isHybrid={true} icon="H" />
             </div>
+          ) : (
+            <div className="panel empty-panel">
+              <h2>Run a query first</h2>
+              <p>Enter a question above and submit. Then use the "Metrics Dashboard" tab to review scoring and visualizations separately.</p>
+            </div>
+          )}
+        </main>
+      )}
 
-            <div className="metrics-grid">
-              {/* Header Row */}
-              <div className="metric-header-row">
-                <div className="metric-label header-cell">Metric</div>
-                <div className="metric-cell header-cell">VectorDB</div>
-                <div className="metric-cell header-cell">Page Index</div>
-                <div className="metric-cell header-cell">Hybrid</div>
+      {route === '#dashboard' && (
+        <main className="dashboard-page">
+          <div className="panel dashboard-panel">
+            <div className="dashboard-header">
+              <div>
+                <h2>📊 Dashboard Overview</h2>
+                <p>Visual comparisons and metrics for the latest query. Use the Compare tab to view only the generated answers.</p>
               </div>
-
-              {/* Row: Faithfulness */}
-              <MetricRow 
-                label="Faithfulness (Relevance to Context)" 
-                vdb={data.results.vectordb.faithfulness_score} 
-                pi={data.results.page_index.faithfulness_score} 
-                hybrid={data.results.hybrid.faithfulness_score} 
-                higherIsBetter={true}
-              />
-              
-              {/* Row: Relevance */}
-              <MetricRow 
-                label="Answer Quality (Relevance to Query)" 
-                vdb={data.results.vectordb.relevance_score} 
-                pi={data.results.page_index.relevance_score} 
-                hybrid={data.results.hybrid.relevance_score} 
-                higherIsBetter={true}
-              />
-
-              {/* Row: Retrieval Diversity */}
-              <MetricRow 
-                label="Retrieval Diversity (Unique Pages)" 
-                vdb={data.results.vectordb.retrieval_diversity} 
-                pi={data.results.page_index.retrieval_diversity} 
-                hybrid={data.results.hybrid.retrieval_diversity} 
-                higherIsBetter={true}
-              />
-
-              {/* Row: Context Length */}
-              <MetricRow 
-                label="Context Length (Chars)" 
-                vdb={data.results.vectordb.context_length_chars} 
-                pi={data.results.page_index.context_length_chars} 
-                hybrid={data.results.hybrid.context_length_chars} 
-                higherIsBetter={true} // Usually more context is better if it's faithful
-              />
+              {results && (
+                <button className="dashboard-action" onClick={() => (window.location.hash = '#compare')}>
+                  View Responses
+                </button>
+              )}
             </div>
-            <div className="hybrid-conclusion">
-              <p>🤖 Notice how the <strong>Hybrid RAG</strong> often scores highest in <em>Retrieval Diversity</em> and <em>Faithfulness</em> by combining the exact matches of Page Index with the semantic nuances of VectorDB. ROUGE overlap shows it takes the best bits of both!</p>
-            </div>
+
+            {!results ? (
+              <div className="empty-panel dashboard-empty">
+                <h3>No metrics yet</h3>
+                <p>Submit a query on the Compare page first to generate results and enable dashboard visualizations.</p>
+              </div>
+            ) : (
+              <>
+                <div className="stats-row">
+                  <StatCard label="Query" value={`"${data.query}"`} />
+                  <StatCard label="Best System" value={bestSystem(results)} />
+                  <StatCard label="Hybrid ROUGE" value={data.comparisons.rouge_vdb_hybrid.toFixed(2)} />
+                  <StatCard label="Chunks Fetched" value={totalChunks(results)} />
+                </div>
+
+                <div className="visualization-panels">
+                  <div className="panel visual-panel">
+                    <h3>Performance Comparison</h3>
+                    <MetricsBarChart data={results} />
+                  </div>
+
+                  <div className="panel visual-panel">
+                    <h3>Quality Radar</h3>
+                    <MetricsRadar data={results} />
+                  </div>
+
+                  <div className="panel visual-panel line-panel">
+                    <h3>Metric Trends</h3>
+                    <MetricsLineChart data={results} />
+                  </div>
+
+                  <div className="pie-column">
+                    <div className="panel small-card">
+                      <h4>Retrieved Chunks</h4>
+                      <RetrievalPie data={results} />
+                    </div>
+                    <div className="panel small-card">
+                      <h4>Latency Breakdown</h4>
+                      <LatencyPie data={results} />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </main>
       )}
@@ -131,20 +192,28 @@ function App() {
   );
 }
 
-function MetricRow({ label, vdb, pi, hybrid, higherIsBetter }) {
-  // Determine winner
-  let maxVal = Math.max(vdb, pi, hybrid);
-  let minVal = Math.min(vdb, pi, hybrid);
-  const bestVal = higherIsBetter ? maxVal : minVal;
-
+function StatCard({ label, value }) {
   return (
-    <div className="metric-row">
-      <div className="metric-label">{label}</div>
-      <div className={`metric-cell ${vdb === bestVal && vdb !== 0 ? 'winner' : ''}`}>{vdb.toFixed(2)}</div>
-      <div className={`metric-cell ${pi === bestVal && pi !== 0 ? 'winner' : ''}`}>{pi.toFixed(2)}</div>
-      <div className={`metric-cell ${hybrid === bestVal && hybrid !== 0 ? 'winner' : ''}`}>{hybrid.toFixed(2)}</div>
+    <div className="stat-card">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
     </div>
   );
+}
+
+function bestSystem(results) {
+  const hybridScore = results.hybrid.faithfulness_score + results.hybrid.relevance_score;
+  const vdbScore = results.vectordb.faithfulness_score + results.vectordb.relevance_score;
+  const piScore = results.page_index.faithfulness_score + results.page_index.relevance_score;
+  const winner = Math.max(hybridScore, vdbScore, piScore);
+
+  if (winner === hybridScore) return 'Hybrid RAG';
+  if (winner === vdbScore) return 'VectorDB RAG';
+  return 'Page Index RAG';
+}
+
+function totalChunks(results) {
+  return results.vectordb.retrieved_chunks.length + results.page_index.retrieved_chunks.length + results.hybrid.retrieved_chunks.length;
 }
 
 function ResultColumn({ title, data, isHybrid, icon }) {
@@ -178,7 +247,7 @@ function ResultColumn({ title, data, isHybrid, icon }) {
   );
 }
 
-function MetricsCharts({ data }) {
+function MetricsBarChart({ data }) {
   const chartData = [
     {
       name: 'Faithfulness',
@@ -202,25 +271,133 @@ function MetricsCharts({ data }) {
 
   return (
     <div className="chart-container">
-      <ResponsiveContainer width="100%" height={350}>
-        <BarChart
-          data={chartData}
-          margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-          <XAxis dataKey="name" stroke="#a1a1aa" tickLine={false} axisLine={false} />
-          <YAxis stroke="#a1a1aa" tickLine={false} axisLine={false} />
-          <Tooltip 
-            cursor={{fill: 'rgba(255,255,255,0.05)'}} 
-            contentStyle={{ backgroundColor: 'rgba(25, 28, 36, 0.9)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '8px' }} 
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.16)" vertical={false} />
+          <XAxis dataKey="name" stroke="#ffffff" tickLine={false} axisLine={false} />
+          <YAxis stroke="#ffffff" tickLine={false} axisLine={false} />
+          <Tooltip
+            cursor={{ fill: 'rgba(255,255,255,0.08)' }}
+            contentStyle={{ backgroundColor: 'rgba(10, 13, 25, 0.98)', borderColor: 'rgba(255,255,255,0.18)', borderRadius: '10px' }}
           />
-          <Legend wrapperStyle={{ paddingTop: '20px' }} />
-          <Bar dataKey="VectorDB" fill="#3a86ff" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="PageIndex" fill="#06d6a0" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="Hybrid" fill="#9d4edd" radius={[4, 4, 0, 0]} />
+          <Legend wrapperStyle={{ paddingTop: '18px', color: '#f0f0f5' }} />
+          <Bar dataKey="VectorDB" fill="#5d5cff" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="PageIndex" fill="#00f4c4" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="Hybrid" fill="#ff4d94" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
+  );
+}
+
+function MetricsLineChart({ data }) {
+  const lineData = [
+    {
+      metric: 'Faithfulness',
+      VectorDB: data.vectordb.faithfulness_score,
+      PageIndex: data.page_index.faithfulness_score,
+      Hybrid: data.hybrid.faithfulness_score,
+    },
+    {
+      metric: 'Relevance',
+      VectorDB: data.vectordb.relevance_score,
+      PageIndex: data.page_index.relevance_score,
+      Hybrid: data.hybrid.relevance_score,
+    },
+    {
+      metric: 'Diversity',
+      VectorDB: data.vectordb.retrieval_diversity,
+      PageIndex: data.page_index.retrieval_diversity,
+      Hybrid: data.hybrid.retrieval_diversity,
+    },
+  ];
+
+  return (
+    <div className="line-chart">
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={lineData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.12)" />
+          <XAxis dataKey="metric" stroke="#ffffff" axisLine={false} tickLine={false} />
+          <YAxis stroke="#ffffff" axisLine={false} tickLine={false} />
+          <Tooltip
+            cursor={{ stroke: 'rgba(255,255,255,0.18)', strokeWidth: 1 }}
+            contentStyle={{ backgroundColor: 'rgba(10, 13, 25, 0.96)', borderColor: 'rgba(255,255,255,0.14)', borderRadius: '10px' }}
+          />
+          <Legend verticalAlign="top" wrapperStyle={{ color: '#f0f0f5', paddingBottom: 10 }} />
+          <Line type="monotone" dataKey="VectorDB" stroke="#5d5cff" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+          <Line type="monotone" dataKey="PageIndex" stroke="#00f4c4" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+          <Line type="monotone" dataKey="Hybrid" stroke="#ff4d94" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function MetricsRadar({ data }) {
+  const radarData = [
+    { metric: 'Faithfulness', VectorDB: data.vectordb.faithfulness_score, PageIndex: data.page_index.faithfulness_score, Hybrid: data.hybrid.faithfulness_score },
+    { metric: 'Relevance', VectorDB: data.vectordb.relevance_score, PageIndex: data.page_index.relevance_score, Hybrid: data.hybrid.relevance_score },
+    { metric: 'Diversity', VectorDB: data.vectordb.retrieval_diversity, PageIndex: data.page_index.retrieval_diversity, Hybrid: data.hybrid.retrieval_diversity },
+  ];
+
+  return (
+    <ResponsiveContainer width="100%" height={320}>
+      <RadarChart data={radarData} outerRadius={115}>
+        <PolarGrid stroke="rgba(255,255,255,0.12)" />
+        <PolarAngleAxis dataKey="metric" stroke="#a1a1aa" />
+        <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} tick={false} />
+        <Radar name="VectorDB" dataKey="VectorDB" stroke="#3a86ff" fill="#3a86ff" fillOpacity={0.35} />
+        <Radar name="PageIndex" dataKey="PageIndex" stroke="#06d6a0" fill="#06d6a0" fillOpacity={0.35} />
+        <Radar name="Hybrid" dataKey="Hybrid" stroke="#9d4edd" fill="#9d4edd" fillOpacity={0.35} />
+        <Legend wrapperStyle={{ color: '#f0f0f5', top: 10 }} />
+      </RadarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function RetrievalPie({ data }) {
+  const chartData = [
+    { name: 'VectorDB', value: data.vectordb.retrieved_chunks.length },
+    { name: 'PageIndex', value: data.page_index.retrieved_chunks.length },
+    { name: 'Hybrid', value: data.hybrid.retrieved_chunks.length },
+  ];
+
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <PieChart>
+        <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={4}>
+          {chartData.map((entry, index) => (
+            <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip
+          contentStyle={{ backgroundColor: 'rgba(15,17,23,0.95)', borderColor: 'rgba(255,255,255,0.12)', borderRadius: '10px' }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+function LatencyPie({ data }) {
+  const chartData = [
+    { name: 'VectorDB', value: data.vectordb.latency_total_sec },
+    { name: 'PageIndex', value: data.page_index.latency_total_sec },
+    { name: 'Hybrid', value: data.hybrid.latency_total_sec },
+  ];
+
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <PieChart>
+        <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={4}>
+          {chartData.map((entry, index) => (
+            <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip
+          contentStyle={{ backgroundColor: 'rgba(15,17,23,0.95)', borderColor: 'rgba(255,255,255,0.12)', borderRadius: '10px' }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
   );
 }
 
