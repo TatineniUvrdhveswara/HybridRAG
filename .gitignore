@@ -27,7 +27,6 @@ instance/
 *.sqlite3
 *.db
 *.sqlite
-chroma_db/
 
 # macOS
 .DS_Store
